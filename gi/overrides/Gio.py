@@ -26,6 +26,9 @@ from ..module import get_introspection_module
 from gi import PyGIWarning
 
 from gi.repository import GLib
+from gi.repository import GObject
+
+from typing import Generic, TypeVar
 
 import sys
 
@@ -421,7 +424,10 @@ DBusProxy = override(DBusProxy)
 __all__.append('DBusProxy')
 
 
-class ListModel(Gio.ListModel):
+ObjectItemType = TypeVar('ObjectItemType', bound=GObject.Object)
+
+
+class ListModel(Gio.ListModel, Generic[ObjectItemType]):
 
     def __getitem__(self, key):
         if isinstance(key, slice):
@@ -473,7 +479,7 @@ else:
         self.splice(position, n_removals, additions)
 
 
-class ListStore(Gio.ListStore):
+class ListStore(Gio.ListStore, Generic[ObjectItemType]):
 
     def sort(self, compare_func, *user_data):
         compare_func = wrap_list_store_sort_func(compare_func)
