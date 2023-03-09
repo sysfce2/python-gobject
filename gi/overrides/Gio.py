@@ -28,7 +28,7 @@ from gi import PyGIWarning
 from gi.repository import GLib
 from gi.repository import GObject
 
-from typing import Generic, TypeVar
+from typing import Callable, Generator, Generic, List, Sequence, TypeVar, Union, overload
 
 import sys
 
@@ -428,6 +428,11 @@ ObjectItemType = TypeVar('ObjectItemType', bound=GObject.Object)
 
 
 class ListModel(Gio.ListModel, Generic[ObjectItemType]):
+    @overload
+    def __getitem__(self, key: slice) -> List[ObjectItemType]: ...
+
+    @overload
+    def __getitem__(self, key: int) -> ObjectItemType: ...
 
     def __getitem__(self, key):
         if isinstance(key, slice):
@@ -444,7 +449,7 @@ class ListModel(Gio.ListModel, Generic[ObjectItemType]):
         else:
             raise TypeError
 
-    def __contains__(self, item):
+    def __contains__(self, item: ObjectItemType) -> bool:
         pytype = self.get_item_type().pytype
         if not isinstance(item, pytype):
             raise TypeError(
@@ -454,10 +459,10 @@ class ListModel(Gio.ListModel, Generic[ObjectItemType]):
                 return True
         return False
 
-    def __len__(self):
+    def __len__(self) -> int:
         return self.get_n_items()
 
-    def __iter__(self):
+    def __iter__(self) -> Generator[ObjectItemType, None, None]:
         for i in range(len(self)):
             yield self.get_item(i)
 
@@ -480,17 +485,20 @@ else:
 
 
 class ListStore(Gio.ListStore, Generic[ObjectItemType]):
-
-    def sort(self, compare_func, *user_data):
+    # Describing the variadic arguments requires TypeVarTuple and unpacking syntax in type annotation:
+    #   compare_func: Callable[Concatenate[ObjectItemType, ObjectItemType, *TypedVarTuple('Args')], int]
+    #   *user_data: *TypedVarTuple('Args')
+    # Since those are only available on Python ≥ 3.11, let’s keep the arguments untyped for now.
+    def sort(self, compare_func: Callable[..., int], *user_data) -> None:
         compare_func = wrap_list_store_sort_func(compare_func)
         return super(ListStore, self).sort(compare_func, *user_data)
 
-    def insert_sorted(self, item, compare_func, *user_data):
+    def insert_sorted(self, item: ObjectItemType, compare_func: Callable[..., int], *user_data) -> None:
         compare_func = wrap_list_store_sort_func(compare_func)
         return super(ListStore, self).insert_sorted(
             item, compare_func, *user_data)
 
-    def __delitem__(self, key):
+    def __delitem__(self, key: Union[int, slice]) -> None:
         if isinstance(key, slice):
             start, stop, step = key.indices(len(self))
             if step == 1:
@@ -508,6 +516,12 @@ class ListStore(Gio.ListStore, Generic[ObjectItemType]):
             self.remove(key)
         else:
             raise TypeError
+
+    @overload
+    def __setitem__(self, key: slice, value: Sequence[ObjectItemType]) -> None: ...
+
+    @overload
+    def __setitem__(self, key: int, value: ObjectItemType) -> None: ...
 
     def __setitem__(self, key, value):
         if isinstance(key, slice):
